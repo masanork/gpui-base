@@ -3165,13 +3165,25 @@ impl<M: InputModeKind> InputBaseState<M> {
         }
     }
 
+    // Modified by ibis inc. (GitHub issue #158): a kanji and its variation selector (an IVS, U+E0100..E01EF, or a standardized
+    // variation sequence, U+FE00..FE0F) are one character for the caret, Backspace and Delete.
     pub(super) fn previous_boundary(&self, offset: usize) -> usize {
-        let offset = self.cursor_boundary(offset.saturating_sub(1), Bias::Left);
+        let mut offset = self.cursor_boundary(offset.saturating_sub(1), Bias::Left);
+        while offset > 0 && self.text.char_at(offset).is_some_and(is_variation_selector) {
+            let before = self.cursor_boundary(offset.saturating_sub(1), Bias::Left);
+            if before == offset {
+                break;
+            }
+            offset = before;
+        }
         self.clamp_offset_to_visible_backward(offset)
     }
 
     pub(super) fn next_boundary(&self, offset: usize) -> usize {
-        let offset = self.cursor_boundary(offset.saturating_add(1), Bias::Right);
+        let mut offset = self.cursor_boundary(offset.saturating_add(1), Bias::Right);
+        while let Some(c) = self.text.char_at(offset).filter(|c| is_variation_selector(*c)) {
+            offset += c.len_utf8();
+        }
         self.clamp_offset_to_visible_forward(offset)
     }
 
@@ -9447,4 +9459,10 @@ impl InputBaseState<crate::input::EditorMode> {
         self.mode.set_smart_indent(smart_indent);
         cx.notify();
     }
+}
+
+/// A variation selector: VS1..VS16 (U+FE00..FE0F) or the ideographic variation selectors VS17..VS256 (U+E0100..E01EF).
+/// Modified by ibis inc. (GitHub issue #158).
+pub(crate) fn is_variation_selector(c: char) -> bool {
+    matches!(c, '\u{FE00}'..='\u{FE0F}' | '\u{E0100}'..='\u{E01EF}')
 }

@@ -1,4 +1,9 @@
 use std::rc::{Rc, Weak};
+// Modified by ibis inc.: the touch time is web_time::Instant in the browser (std::time::Instant::now panics on wasm32-unknown-unknown).
+#[cfg(not(target_family = "wasm"))]
+use std::time::Instant;
+#[cfg(target_family = "wasm")]
+use web_time::Instant;
 
 use gpui::{App, Entity, Global, OwnedMenu};
 
@@ -20,7 +25,7 @@ pub struct GlobalState {
     selection_document_order: u64,
     /// When a finger last went down. A tap reaches controls as a mouse press;
     /// this is how they tell it from one.
-    last_touch: Option<web_time::Instant>,
+    last_touch: Option<Instant>,
 }
 
 impl Global for GlobalState {}
@@ -41,7 +46,7 @@ impl GlobalState {
     /// offers on every touch, before it becomes a tap, a long press or a pan.
     pub fn note_touch(cx: &mut App) {
         Self::init(cx);
-        Self::global_mut(cx).last_touch = Some(web_time::Instant::now());
+        Self::global_mut(cx).last_touch = Some(Instant::now());
     }
 
     /// Whether the press being handled came from a finger: a touch went
